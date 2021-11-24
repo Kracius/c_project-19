@@ -1,0 +1,361 @@
+#include <iostream>
+
+using namespace std;
+
+struct Questions {
+    string q = "Q-Empty";
+    string a = "A-Empty";
+    string wA[3] = {"WA-Empty", "WA-Empty", "WA-Empty"};
+};
+
+struct Settings {
+    int questionArraySize = 15;
+    int questionSize = 5;
+    bool useHelps = true;
+    int allowedWrongAnswersCount = 3;
+};
+
+struct GameVariables {
+    bool useFifty = false;
+    bool useRandomizer = false;
+    int wrongAnswers = 0;
+    int goodQuestionCount = 0;
+    int currQuestionNumber = 0;
+    bool breakGame = false;
+};
+
+Questions *questions;
+
+GameVariables gameVars;
+
+Settings settings;
+enum EMainMenu {
+    StartGame,
+    Settings,
+    Rules,
+    MExit
+};
+
+enum ESettingsMenu {
+    SetSize,
+    ToggleUseHelp,
+    SetWrongAnswers,
+    ToQMenu,
+    SExit
+};
+
+enum EQuestionMenu {
+    SetAllQ,
+    PrintAllQ,
+    SetSpecQ,
+    PrintSpecQ,
+    QExit
+};
+
+void fillEmptyQuestions() {
+    for (int i = 0; i < settings.questionArraySize; i++) {
+        questions[i] = Questions();
+    }
+}
+
+string getStringFromUser(string text) {
+    string tmp;
+    printf("%s\n", text.c_str());
+    cin >> tmp;
+    return tmp;
+}
+
+int getIntFromUser(string text) {
+    int tmp;
+    printf("%s\n", text.c_str());
+    cin >> tmp;
+    return tmp;
+}
+
+void setAllQuestions() {
+    for (int i = 0; i < settings.questionArraySize; i++) {
+        printf("Ожидаю ввода данных для вопросника %i/%i\n", i + 1, settings.questionArraySize);
+        questions[i] = {getStringFromUser("Введи новый вопрос:"), getStringFromUser("Введи правильный ответ:"),
+                        getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 1:"),
+                        getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 2:"),
+                        getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 3:")};
+    }
+}
+
+void printAllQuestions() {
+    for (int i = 0; i < settings.questionArraySize; i++) {
+        printf("Вопросник № %i из %i:\n", i + 1, settings.questionArraySize);
+        Questions &q = questions[i];
+        printf("Вопрос: %s,\n Ответ: %s,\n Лишние ответы:\n \t* %s;\n \t* %s;\n \t* %s;\n\n", q.q.c_str(), q.a.c_str(),
+               q.wA[0].c_str(), q.wA[1].c_str(), q.wA[2].c_str());
+    }
+}
+
+void setSpecQuestion() {
+    int act = getIntFromUser("Введи нужный для редактирования вопросник (начиная с нуля) или -1 для возврата:");
+    if (act <= -1)
+        return;
+    if (act >= settings.questionArraySize) {
+        printf("Введенное число больше кол-ва вопросников %i/%i\n", act, settings.questionArraySize);
+        return;
+    }
+    Questions &q = questions[act];
+    printf("Вопросник № %i из %i:\n", act + 1, settings.questionArraySize);
+    printf("Вопрос: %s,\n Ответ: %s,\n Лишние ответы:\n \t* %s;\n \t* %s;\n \t* %s;\n\n", q.q.c_str(), q.a.c_str(),
+           q.wA[0].c_str(), q.wA[1].c_str(), q.wA[2].c_str());
+    printf("Новая запись:\n");
+    questions[act] = {getStringFromUser("Введи новый вопрос:"), getStringFromUser("Введи правильный ответ:"),
+                      getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 1:"),
+                      getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 2:"),
+                      getStringFromUser("Введи НЕПРАВИЛЬНЫЙ вариант ответа 3:")};
+}
+
+void printQuestionByIndex(int i) {
+    if (i <= -1)
+        return;
+    if (i >= settings.questionArraySize) {
+        printf("Введенное число больше кол-ва вопросников %i/%i\n", i, settings.questionArraySize);
+        return;
+    }
+    Questions &q = questions[i];
+    printf("Вопросник № %i из %i:\n", i + 1, settings.questionArraySize);
+    printf("Вопрос: %s,\n Ответ: %s,\n Лишние ответы:\n \t* %s;\n \t* %s;\n \t* %s;\n\n", q.q.c_str(), q.a.c_str(),
+           q.wA[0].c_str(), q.wA[1].c_str(), q.wA[2].c_str());
+}
+
+void printSpecQuestion() {
+    printQuestionByIndex(
+            getIntFromUser("Введи нужный для редактирования вопросник (начиная с нуля) или -1 для возврата:"));
+}
+
+enum InGameMenu {
+    WriteAnswer,
+    UseHelp,
+    BreakGame
+};
+
+bool checkWin() {
+    if (gameVars.breakGame) {
+        return true;
+    }
+    if (gameVars.wrongAnswers >= settings.allowedWrongAnswersCount) {
+        printf("Проигрыш! много неправильных ответов\n");
+        return true;
+    }
+    if (gameVars.currQuestionNumber >= settings.questionSize) {
+        printf("Выйграл!\n");
+        return true;
+    }
+    return false;
+}
+
+void requestAnswerAndCheck(Questions q) {
+    string wrongAnswer = q.wA[1], anotherWrongAnswer = q.wA[2];
+    if (gameVars.useFifty) {
+        wrongAnswer.append(" **");
+        anotherWrongAnswer.append(" **");
+        gameVars.useFifty = false;
+        printf("Ответы с ** - неправильные.");
+    }
+
+    if (gameVars.useRandomizer) {
+        printf("Рандом подсказывает вам ответ: %i", rand() % 4 + 1);
+    }
+
+    string answers[4] = {q.a, q.wA[0], wrongAnswer, anotherWrongAnswer};
+
+    for (auto &answer: answers) {
+        swap(answer, answers[rand() % 4]);
+    }
+    printf("Вопрос: %s,\nОтветы: "
+           "\n \t* 1)%s;"
+           "\n \t* 2)%s;"
+           "\n \t* 3)%s;"
+           "\n \t* 4)%s;\n\n", q.q.c_str(), answers[0].c_str(),
+           answers[1].c_str(), answers[2].c_str(), answers[3].c_str());
+
+    while (true) {
+        int i = getIntFromUser("Введи номер ответа(-1 для выхода в предыдущее меню):");
+        if (i == -1)
+            break;
+        if (i < 0 || i > 5) {
+            printf("Неправильный диапазон!\n");
+            continue;
+        }
+        string answerFromUser = answers[i - 1];
+        if (answerFromUser == q.a) {
+            printf("Ответ правильный!\n");
+            gameVars.goodQuestionCount++;
+
+        } else {
+            printf("Ответ не правильный!\n");
+            gameVars.wrongAnswers++;
+        }
+        break;
+    }
+}
+
+enum HelpMenu {
+    UseFifty,
+    UseRandomizer,
+    HBack
+};
+
+void useHelp() {
+    while (true) {
+        printf("Меню помощи:\n"
+               "0) Режим 50/50\n"
+               "1) Использовать рандомайзер-подсказчик\n"
+               "2) Вернуться обратно\n");
+        int act = getIntFromUser("Какую помощь ожидаешь?");
+        switch (act) {
+            case UseFifty:
+                gameVars.useFifty = !gameVars.useFifty;
+                printf("Успех! Используется режим 50/50: %i\n", gameVars.useFifty);
+                break;
+            case UseRandomizer:
+                gameVars.useRandomizer = !gameVars.useRandomizer;
+                printf("Успех! Используется рандомайзер: %i\n", gameVars.useRandomizer);
+                break;
+            case HBack:
+                return;
+        }
+    }
+
+}
+
+void printInGameMenu(Questions q) {
+    while (true) {
+        printf("Меню игры:\n"
+               "0) Написать ответ\n"
+               "1) Использовать помощь\n"
+               "2) Прервать игру\n");
+        int act = getIntFromUser("Что делать будем?");
+        switch (act) {
+            case WriteAnswer:
+                requestAnswerAndCheck(q);
+                break;
+
+            case UseHelp:
+                if (!settings.useHelps) {
+                    printf("Помощь отключена настройками!\n");
+                    break;
+                }
+                useHelp();
+                break;
+
+            case BreakGame:
+                printf("Игра прервана!\n");
+                gameVars.breakGame = true;
+                return;
+        }
+    }
+}
+
+void startGame() {
+    gameVars = *new GameVariables();
+    printf("Игра началась!\n");
+    do {
+        int randomQNum = rand() % settings.questionArraySize;
+        Questions &q = questions[randomQNum];
+        gameVars.currQuestionNumber++;
+        printInGameMenu(q);
+    } while (!checkWin());
+    printf("Игра закончилась!\n");
+}
+
+void questionSettingsMenu() {
+    while (true) {
+        printf("Настройки вопросников:\n"
+               "0) Переписать все вопросники\n"
+               "1) Вывести все вопросники\n"
+               "2) Переписать определенный вопросник\n"
+               "3) Вывести определенный опросник\n");
+        int act = getIntFromUser("Выбор? ");
+        switch (act) {
+            case SetAllQ:
+                setAllQuestions();
+                break;
+            case PrintAllQ:
+                printAllQuestions();
+                break;
+            case SetSpecQ:
+                setSpecQuestion();
+                break;
+            case PrintSpecQ:
+                printSpecQuestion();
+                break;
+            case QExit:
+                return;
+            default:
+                break;
+        }
+    }
+}
+
+void settingsMenu() {
+    while (true) {
+        printf("Настройки:\n"
+               "0) Размер массива вопросов\n"
+               "1) Разрешить использование помощи в игре\n"
+               "2) Установить кол-во неправильных ответов для проигрыша\n"
+               "3) Настройки вопросников\n"
+               "4) Вернуться обратно\n");
+
+        int act = getIntFromUser("Выбор? ");
+        switch (act) {
+            case SetSize:
+                settings.questionArraySize = getIntFromUser("Размер массива вопросов?");
+                questions = new Questions[settings.questionArraySize];
+                fillEmptyQuestions();
+                break;
+            case ToggleUseHelp:
+                settings.useHelps = !settings.useHelps;
+                printf("Использование помощи: %i\n", settings.useHelps);
+                break;
+            case SetWrongAnswers:
+                settings.allowedWrongAnswersCount = getIntFromUser("Сколько неправильных ответов может дать юзер?");
+                printf("Кол-во разрешенных ошибок: %i\n", settings.allowedWrongAnswersCount);
+            case ToQMenu:
+                questionSettingsMenu();
+                break;
+            case SExit:
+                return;
+            default:
+                break;
+
+        }
+    }
+}
+
+void printRules() {
+    printf("Какие-то правила.\n");
+}
+
+int main() {
+    questions = new Questions[settings.questionArraySize];
+    fillEmptyQuestions();
+    while (true) {
+        printf("Меню:\n"
+               "0) Начать игру\n"
+               "1) Настройки\n"
+               "2) Правила\n"
+               "3) Выход\n");
+        int act = getIntFromUser("Выбор? ");
+        switch (act) {
+            case StartGame:
+                startGame();
+                break;
+            case Settings:
+                settingsMenu();
+                break;
+            case Rules:
+                printRules();
+                break;
+            case MExit:
+                return 0;
+            default:
+                break;
+        }
+    }
+}
